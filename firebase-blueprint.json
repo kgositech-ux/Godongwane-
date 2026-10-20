@@ -1,0 +1,237 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 1024 },
+        "role": { "type": "string", "enum": ["admin", "project_manager", "collaborator", "employee"] },
+        "organization": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Trusted administrative user record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 256 },
+        "addedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["email"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Client organization or business record",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 256 },
+        "email": { "type": "string", "maxLength": 256 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "maxLength": 256 },
+        "address": { "type": "string", "maxLength": 512 },
+        "status": { "type": "string", "enum": ["active", "inactive", "lead"] },
+        "notes": { "type": "string", "maxLength": 2048 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "createdBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["name"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Project record with milestone metrics and status",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 256 },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 4096 },
+        "status": { "type": "string", "enum": ["planning", "in_progress", "on_hold", "completed"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "startDate": { "type": "string", "maxLength": 64 },
+        "targetCompletionDate": { "type": "string", "maxLength": 64 },
+        "budget": { "type": "number" },
+        "progressPercentage": { "type": "number" },
+        "managerId": { "type": "string", "maxLength": 128 },
+        "managerName": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["name", "status"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Project task item for tracking and collaboration",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 4096 },
+        "status": { "type": "string", "enum": ["todo", "in_progress", "review", "done"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "assignedTo": { "type": "string", "maxLength": 128 },
+        "assignedToEmail": { "type": "string", "maxLength": 256 },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "estimatedHours": { "type": "number" },
+        "actualHours": { "type": "number" },
+        "milestoneId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["projectId", "title", "status"]
+    },
+    "Milestone": {
+      "title": "Milestone",
+      "description": "Project milestone for progress visualization",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 2048 },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
+        "progress": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["projectId", "title", "status"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Centralized repository document or file record",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "maxLength": 128 },
+        "projectName": { "type": "string", "maxLength": 256 },
+        "title": { "type": "string", "maxLength": 256 },
+        "type": { "type": "string", "enum": ["blueprint", "contract", "specification", "report", "invoice", "drive_export", "other"] },
+        "fileUrl": { "type": "string", "maxLength": 2048 },
+        "fileSize": { "type": "string", "maxLength": 64 },
+        "driveFileId": { "type": "string", "maxLength": 256 },
+        "driveLink": { "type": "string", "maxLength": 2048 },
+        "uploadedBy": { "type": "string", "maxLength": 128 },
+        "uploadedByEmail": { "type": "string", "maxLength": 256 },
+        "notes": { "type": "string", "maxLength": 2048 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["title", "type"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Automated progress notification and alert",
+      "type": "object",
+      "properties": {
+        "recipientEmail": { "type": "string", "maxLength": 256 },
+        "title": { "type": "string", "maxLength": 256 },
+        "message": { "type": "string", "maxLength": 2048 },
+        "type": { "type": "string", "enum": ["task_assigned", "milestone_completed", "status_update", "system"] },
+        "projectId": { "type": "string", "maxLength": 128 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["recipientEmail", "title", "message"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Team member and employee directory record",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "role": { "type": "string", "maxLength": 128 },
+        "department": { "type": "string", "maxLength": 128 },
+        "hourlyRate": { "type": "number" },
+        "phone": { "type": "string", "maxLength": 64 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["name", "email"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Client invoice and billing record",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": { "type": "string", "maxLength": 64 },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 256 },
+        "projectId": { "type": "string", "maxLength": 128 },
+        "projectName": { "type": "string", "maxLength": 256 },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 8 },
+        "status": { "type": "string", "enum": ["draft", "sent", "paid", "overdue"] },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "issuedDate": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["invoiceNumber", "clientName", "amount", "status"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "Log of actions and changes on projects, tasks, and documents",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["project", "task", "document", "milestone", "client"] },
+        "action": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 2048 },
+        "userName": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 256 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "entityId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["type", "action", "title", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles indexed by UID"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "System administrators mapping"
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Company clients database"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Projects tracking directory"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Task items linked to projects"
+    },
+    "/milestones/{milestoneId}": {
+      "schema": "Milestone",
+      "description": "Project milestone tracking"
+    },
+    "/documents/{documentId}": {
+      "schema": "Document",
+      "description": "Centralized repository documents"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User automated progress notifications"
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Employee and staff directory"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Client billing and invoices"
+    },
+    "/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "Recent changes and activity audit trail"
+    }
+  }
+}

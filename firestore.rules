@@ -1,0 +1,216 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Catch-All Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Diagnostic/Connection test doc
+    match /test/connection {
+      allow read, write: if true;
+    }
+
+    // Primitive Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isBootstrapAdminEmail() {
+      return isSignedIn() && (
+        request.auth.token.email == 'servicewebsites6@gmail.com' ||
+        request.auth.token.email == 'mthethwapraisegodcebolenkosi@gmail.com'
+      );
+    }
+
+    function isAdmin() {
+      return isBootstrapAdminEmail() || (
+        isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Entity Validation Helpers
+    function isValidClient(data) {
+      return data.keys().hasAll(['name']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 256 &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 256)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 64)) &&
+        (!('type' in data) || (data.type is string && data.type.size() <= 256)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 512)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 2048));
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['name', 'status']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 256 &&
+        data.status in ['planning', 'in_progress', 'on_hold', 'completed'] &&
+        (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
+        (!('clientName' in data) || (data.clientName is string && data.clientName.size() <= 256)) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 4096)) &&
+        (!('priority' in data) || data.priority in ['low', 'medium', 'high', 'urgent']) &&
+        (!('budget' in data) || data.budget is number) &&
+        (!('progressPercentage' in data) || (data.progressPercentage is number && data.progressPercentage >= 0 && data.progressPercentage <= 100));
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['projectId', 'title', 'status']) &&
+        data.projectId is string && data.projectId.size() <= 128 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 256 &&
+        data.status in ['todo', 'in_progress', 'review', 'done'] &&
+        (!('priority' in data) || data.priority in ['low', 'medium', 'high', 'urgent']) &&
+        (!('assignedTo' in data) || (data.assignedTo is string && data.assignedTo.size() <= 128)) &&
+        (!('assignedToEmail' in data) || (data.assignedToEmail is string && data.assignedToEmail.size() <= 256)) &&
+        (!('estimatedHours' in data) || (data.estimatedHours is number && data.estimatedHours >= 0)) &&
+        (!('actualHours' in data) || (data.actualHours is number && data.actualHours >= 0));
+    }
+
+    function isValidMilestone(data) {
+      return data.keys().hasAll(['projectId', 'title', 'status']) &&
+        data.projectId is string && data.projectId.size() <= 128 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 256 &&
+        data.status in ['pending', 'in_progress', 'completed'] &&
+        (!('progress' in data) || (data.progress is number && data.progress >= 0 && data.progress <= 100));
+    }
+
+    function isValidDocument(data) {
+      return data.keys().hasAll(['title', 'type']) &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 256 &&
+        data.type in ['blueprint', 'contract', 'specification', 'report', 'invoice', 'drive_export', 'other'] &&
+        (!('projectId' in data) || (data.projectId is string && data.projectId.size() <= 128)) &&
+        (!('fileUrl' in data) || (data.fileUrl is string && data.fileUrl.size() <= 2048)) &&
+        (!('driveFileId' in data) || (data.driveFileId is string && data.driveFileId.size() <= 256)) &&
+        (!('driveLink' in data) || (data.driveLink is string && data.driveLink.size() <= 2048));
+    }
+
+    function isValidEmployee(data) {
+      return data.keys().hasAll(['name', 'email']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 128 &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 256 &&
+        (!('role' in data) || (data.role is string && data.role.size() <= 128)) &&
+        (!('hourlyRate' in data) || (data.hourlyRate is number && data.hourlyRate >= 0));
+    }
+
+    function isValidInvoice(data) {
+      return data.keys().hasAll(['invoiceNumber', 'clientName', 'amount', 'status']) &&
+        data.invoiceNumber is string && data.invoiceNumber.size() > 0 && data.invoiceNumber.size() <= 64 &&
+        data.clientName is string && data.clientName.size() <= 256 &&
+        data.amount is number && data.amount >= 0 &&
+        data.status in ['draft', 'sent', 'paid', 'overdue'];
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['recipientEmail', 'title', 'message']) &&
+        data.recipientEmail is string && data.recipientEmail.size() <= 256 &&
+        data.title is string && data.title.size() <= 256 &&
+        data.message is string && data.message.size() <= 2048;
+    }
+
+    // Collections Rules
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (isAdmin() || (isOwner(userId) && (!('role' in incoming()) || incoming().role == existing().role)));
+      allow delete: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(clientId) && isValidClient(incoming());
+      allow update: if isSignedIn() && isValidId(clientId) && isValidClient(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(projectId) && isValidProject(incoming());
+      allow update: if isSignedIn() && isValidId(projectId) && isValidProject(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
+      allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /milestones/{milestoneId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(milestoneId) && isValidMilestone(incoming());
+      allow update: if isSignedIn() && isValidId(milestoneId) && isValidMilestone(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /documents/{documentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(documentId) && isValidDocument(incoming());
+      allow update: if isSignedIn() && isValidId(documentId) && isValidDocument(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(employeeId) && isValidEmployee(incoming());
+      allow update: if isSignedIn() && isValidId(employeeId) && isValidEmployee(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(invoiceId) && isValidInvoice(incoming());
+      allow update: if isSignedIn() && isValidId(invoiceId) && isValidInvoice(incoming());
+      allow delete: if isAdmin();
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['type', 'action', 'title', 'timestamp']) &&
+        data.type in ['project', 'task', 'document', 'milestone', 'client'] &&
+        data.action is string && data.action.size() <= 64 &&
+        data.title is string && data.title.size() <= 256 &&
+        data.timestamp is string && data.timestamp.size() <= 64 &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 2048));
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.recipientEmail == request.auth.token.email ||
+        resource.data.recipientEmail == 'all' ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && isValidId(notificationId) && (
+        resource.data.recipientEmail == request.auth.token.email || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /activities/{activityId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(activityId) && isValidActivity(incoming());
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+  }
+}

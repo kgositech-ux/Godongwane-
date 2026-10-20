@@ -1,0 +1,6 @@
+{
+  "name": "Godongwane Progressive Projects",
+  "description": "Enterprise Project Management & Collaboration Platform for Godongwane Progressive Projects with task tracking, milestone visualization, documents repository, and role-based access control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

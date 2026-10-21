@@ -60,11 +60,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'settings' as ActiveTab, label: 'Settings', icon: Settings, badge: null },
   ];
 
-  const userInitial = userProfile?.displayName
-    ? userProfile.displayName.charAt(0).toUpperCase()
-    : currentUser?.email
-    ? currentUser.email.charAt(0).toUpperCase()
-    : 'G';
+  // User requested: Replace username and service website email with mthethwapraisegodcebolenkosi@gmail.com
+  const displayEmail =
+    currentUser?.email && currentUser.email !== 'servicewebsites6@gmail.com'
+      ? currentUser.email
+      : 'mthethwapraisegodcebolenkosi@gmail.com';
+
+  const displayName =
+    userProfile?.displayName && userProfile.displayName !== 'Kgosi'
+      ? userProfile.displayName
+      : currentUser?.displayName && currentUser.displayName !== 'Kgosi'
+      ? currentUser.displayName
+      : 'mthethwapraisegodcebolenkosi';
+
+  const userInitial = displayName.charAt(0).toUpperCase();
 
   const handleNavClick = (tab: ActiveTab) => {
     setActiveTab(tab);
@@ -86,25 +95,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Top Header matching user screenshot */}
+        {/* Top Header: Godongwane Progressive Projects */}
         <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-bold text-lg shadow-md shadow-amber-500/20">
-              S
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black text-xl shadow-md shadow-amber-500/20">
+              G
             </div>
             <div>
-              <div className="font-semibold text-slate-100 text-sm leading-tight flex items-center gap-1.5">
-                Service Websites
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+              <div className="font-bold text-slate-100 text-sm leading-tight flex items-center gap-1.5">
+                Godongwane
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20 font-semibold uppercase tracking-wider">
                   PRO
                 </span>
               </div>
-              <div className="text-xs text-slate-400">Admin Console</div>
+              <div className="text-xs text-slate-400 font-medium">Progressive Projects</div>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 lg:hidden"
+            aria-label="Close navigation"
           >
             <X className="w-5 h-5" />
           </button>
@@ -189,7 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-semibold text-slate-100 truncate flex items-center gap-1">
-                  {userProfile?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Kgosi')}
+                  <span>{displayName}</span>
                   {isAdmin && (
                     <span title="Full Administrator">
                       <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -197,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </div>
                 <div className="text-[11px] text-slate-400 truncate font-mono">
-                  {currentUser?.email || 'servicewebsites6@gmail.com'}
+                  {displayEmail}
                 </div>
               </div>
             </div>

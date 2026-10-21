@@ -36,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleSeed = async () => {
     setSeeding(true);
     try {
-      await seedInitialDatabase(currentUser?.email || 'servicewebsites6@gmail.com');
+      await seedInitialDatabase(currentUser?.email || 'mthethwapraisegodcebolenkosi@gmail.com');
       setSeededSuccess(true);
       setTimeout(() => setSeededSuccess(false), 3000);
     } catch (e) {

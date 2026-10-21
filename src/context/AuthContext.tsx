@@ -8,6 +8,7 @@ import {
   signOut,
   updateProfile,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
 } from 'firebase/auth';
 import {
   doc,
@@ -22,6 +23,8 @@ import {
   checkIsAdmin,
   handleFirestoreError,
   OperationType,
+  getCachedAccessToken,
+  setCachedAccessToken,
 } from '../firebase';
 import { UserProfile, UserRole } from '../types';
 
@@ -31,10 +34,12 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   error: string | null;
+  accessToken: string | null;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  connectGoogleDrive: () => Promise<string>;
   logout: () => Promise<void>;
   clearError: () => void;
   refreshProfile: () => Promise<void>;
@@ -47,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(getCachedAccessToken());
 
   const fetchOrCreateProfile = async (user: User): Promise<UserProfile> => {
     const userDocRef = doc(db, 'users', user.uid);
@@ -112,6 +118,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUserProfile(null);
+        setCachedAccessToken(null);
+        setAccessToken(null);
       }
       setLoading(false);
     });
@@ -123,10 +131,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setCachedAccessToken(credential.accessToken);
+        setAccessToken(credential.accessToken);
+      }
       await fetchOrCreateProfile(result.user);
     } catch (err: any) {
       console.error('Google Sign-in failed', err);
       setError(err.message || 'Google sign-in failed');
+      throw err;
+    }
+  };
+
+  const connectGoogleDrive = async (): Promise<string> => {
+    setError(null);
+    try {
+      const current = getCachedAccessToken();
+      if (current) {
+        setAccessToken(current);
+        return current;
+      }
+      const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential?.accessToken) {
+        throw new Error('Google Drive access token could not be obtained.');
+      }
+      setCachedAccessToken(credential.accessToken);
+      setAccessToken(credential.accessToken);
+      await fetchOrCreateProfile(result.user);
+      return credential.accessToken;
+    } catch (err: any) {
+      console.error('Google Drive connection failed', err);
+      setError(err.message || 'Google Drive connection failed');
       throw err;
     }
   };
@@ -172,6 +209,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await signOut(auth);
+      setCachedAccessToken(null);
+      setAccessToken(null);
       setUserProfile(null);
       setCurrentUser(null);
     } catch (err: any) {
@@ -199,10 +238,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         loading,
         error,
+        accessToken,
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,
         resetPassword,
+        connectGoogleDrive,
         logout,
         clearError: () => setError(null),
         refreshProfile,

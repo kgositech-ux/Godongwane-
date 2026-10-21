@@ -39,10 +39,20 @@ import { SettingsView } from './components/SettingsView';
 import { AuthModal } from './components/AuthModal';
 import { GoogleDriveExportModal } from './components/GoogleDriveExportModal';
 import { NotificationsModal } from './components/NotificationsModal';
-import { seedInitialDatabase } from './utils/seedData';
+import {
+  seedInitialDatabase,
+  initialClients,
+  initialProjects,
+  initialMilestones,
+  initialTasks,
+  initialEmployees,
+  initialDocuments,
+  initialInvoices,
+} from './utils/seedData';
+import { Shield } from 'lucide-react';
 
 function MainApp() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -53,19 +63,24 @@ function MainApp() {
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
   const [newTaskModalOpen, setNewTaskModalOpen] = useState(false);
 
-  // Data Collections
-  const [clients, setClients] = useState<Client[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  // Data Collections initialized with initial demo records for smooth immediate view
+  const [clients, setClients] = useState<Client[]>(
+    initialClients.map((c, i) => ({ ...c, id: `client-${i + 1}` }))
+  );
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
+  const [documents, setDocuments] = useState<ProjectDocument[]>(initialDocuments);
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
+  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
 
-  // Setup Firestore real-time listeners
+  // Setup Firestore real-time listeners (CRITICAL: Only attach onSnapshot if auth is ready and user is authenticated)
   useEffect(() => {
+    if (loading || !currentUser) {
+      return;
+    }
     // 1. Clients Listener
     const unsubClients = onSnapshot(
       collection(db, 'clients'),
@@ -182,7 +197,7 @@ function MainApp() {
       unsubNotifications();
       unsubActivities();
     };
-  }, [currentUser]);
+  }, [currentUser, loading]);
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
@@ -234,6 +249,24 @@ function MainApp() {
           unreadCount={unreadNotifsCount}
           currentTitle={getTabTitle(activeTab)}
         />
+
+        {/* Demo notification banner when not signed in */}
+        {!currentUser && !loading && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-500/20 px-4 py-2 sm:px-8 flex items-center justify-between text-xs text-amber-200">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Offline Preview:</strong> Sign in with Google or Email to unlock cloud synchronization and full administrator access.
+              </span>
+            </div>
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className="px-2.5 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors shrink-0 shadow-xs ml-2"
+            >
+              Sign In
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {activeTab === 'dashboard' && (
@@ -294,7 +327,7 @@ function MainApp() {
           )}
 
           {activeTab === 'employees' && (
-            <EmployeesView employees={employees} />
+            <EmployeesView employees={employees} tasks={tasks} />
           )}
 
           {activeTab === 'payroll' && (

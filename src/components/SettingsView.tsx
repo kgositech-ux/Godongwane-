@@ -31,12 +31,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [reloading, setReloading] = useState(false);
   const [privacyModal, setPrivacyModal] = useState(false);
 
+  const displayEmail =
+    currentUser?.email && currentUser.email !== 'servicewebsites6@gmail.com'
+      ? currentUser.email
+      : 'mthethwapraisegodcebolenkosi@gmail.com';
+
+  const displayName =
+    userProfile?.displayName && userProfile.displayName !== 'Kgosi'
+      ? userProfile.displayName
+      : currentUser?.displayName && currentUser.displayName !== 'Kgosi'
+      ? currentUser.displayName
+      : 'mthethwapraisegodcebolenkosi';
+
   const handleCopyDiagnostics = () => {
     const report = {
-      agency: 'Service Websites Agency',
+      agency: 'Godongwane Progressive Projects',
       platform: 'Godongwane Progressive Projects Management Software',
       authMethod: currentUser?.providerData[0]?.providerId || 'password',
-      email: currentUser?.email || 'servicewebsites6@gmail.com',
+      email: displayEmail,
       isAdmin,
       role: userProfile?.role || 'admin',
       firestoreDatabase: 'ai-studio-godongwaneprojec-b6fc9153-bf16-4eba-afc3-c2d65192ccdf',
@@ -51,7 +63,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!window.confirm('Reload initial Godongwane Progressive Projects demo dataset?')) return;
     setReloading(true);
     try {
-      await seedInitialDatabase(currentUser?.email || 'servicewebsites6@gmail.com');
+      await seedInitialDatabase(displayEmail);
       alert('Godongwane projects and clients successfully reloaded!');
     } catch (e) {
       console.error(e);
@@ -62,17 +74,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Title Header matching Screenshot 2 */}
+      {/* Title Header */}
       <div>
         <h2 className="text-xl sm:text-2xl font-serif font-bold text-slate-100 tracking-tight">
           Settings
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-          Service Websites Agency
+          Godongwane Progressive Projects
         </p>
       </div>
 
-      {/* Account Card matching Screenshot 2 */}
+      {/* Account Card */}
       <div className="p-6 rounded-2xl bg-[#141c2c] border border-slate-800 shadow-xl space-y-4">
         <div>
           <h3 className="text-base font-bold text-white">Account</h3>
@@ -85,11 +97,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-amber-400 text-slate-950 font-bold flex items-center justify-center text-sm shadow-md">
-              {currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : 'K'}
+              {displayName.charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                <span>{userProfile?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Kgosi')}</span>
+                <span>{displayName}</span>
                 {isAdmin && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     Administrator
@@ -97,7 +109,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 )}
               </div>
               <div className="text-[11px] text-slate-400 font-mono">
-                {currentUser?.email || 'servicewebsites6@gmail.com'}
+                {displayEmail}
               </div>
             </div>
           </div>

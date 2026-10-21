@@ -20,12 +20,24 @@ import firebaseConfig from '../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 
 // CRITICAL: Initialize Firestore with firestoreDatabaseId as required
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const firestoreDatabaseId =
+  (firebaseConfig as Record<string, any>).firestoreDatabaseId ||
+  'ai-studio-godongwaneprojec-b6fc9153-bf16-4eba-afc3-c2d65192ccdf';
+export const db = getFirestore(app, firestoreDatabaseId);
 export const auth = getAuth(app);
 
-// Google Auth Provider
+// Google Auth Provider with Google Drive scope
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+// In-memory caching for OAuth access token (never stored in localStorage/sessionStorage)
+let cachedAccessToken: string | null = null;
+
+export const getCachedAccessToken = (): string | null => cachedAccessToken;
+export const setCachedAccessToken = (token: string | null) => {
+  cachedAccessToken = token;
+};
 
 // Diagnostic test connection on boot as mandated by Firebase skill
 export async function testConnection() {
@@ -96,8 +108,8 @@ export function handleFirestoreError(
 
 // Full admin emails requested by user
 export const ADMIN_EMAILS = [
-  'servicewebsites6@gmail.com',
   'mthethwapraisegodcebolenkosi@gmail.com',
+  'servicewebsites6@gmail.com',
 ];
 
 export function checkIsAdmin(email: string | null | undefined): boolean {

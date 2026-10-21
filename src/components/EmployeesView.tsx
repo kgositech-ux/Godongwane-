@@ -12,7 +12,7 @@ import {
   X,
   CheckCircle,
 } from 'lucide-react';
-import { Employee } from '../types';
+import { Employee, Task } from '../types';
 import { db, handleFirestoreError, OperationType, checkIsAdmin } from '../firebase';
 import {
   collection,
@@ -22,13 +22,17 @@ import {
   doc,
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { EmployeeProductivityMetrics } from './EmployeeProductivityMetrics';
+import { BarChart3, Users as UsersIcon } from 'lucide-react';
 
 interface EmployeesViewProps {
   employees: Employee[];
+  tasks?: Task[];
 }
 
-export const EmployeesView: React.FC<EmployeesViewProps> = ({ employees }) => {
+export const EmployeesView: React.FC<EmployeesViewProps> = ({ employees, tasks = [] }) => {
   const { currentUser, isAdmin } = useAuth();
+  const [viewMode, setViewMode] = useState<'metrics' | 'roster'>('metrics');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
@@ -132,13 +136,41 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({ employees }) => {
           </p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md shadow-amber-500/20"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Add Employee</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* View Toggle */}
+          <div className="p-1 rounded-xl bg-slate-900 border border-slate-800 flex items-center">
+            <button
+              onClick={() => setViewMode('metrics')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'metrics'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Productivity Metrics</span>
+            </button>
+            <button
+              onClick={() => setViewMode('roster')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'roster'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <UsersIcon className="w-3.5 h-3.5" />
+              <span>Team Roster ({employees.length})</span>
+            </button>
+          </div>
+
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md shadow-amber-500/20"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Add Employee</span>
+          </button>
+        </div>
       </div>
 
       {/* Admin Notice Banner matching user prompt */}
@@ -154,8 +186,20 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({ employees }) => {
         </div>
       </div>
 
+      {/* Productivity Metrics with Recharts */}
+      {viewMode === 'metrics' && (
+        <EmployeeProductivityMetrics employees={employees} tasks={tasks} />
+      )}
+
       {/* Employee Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <span>Fabrication Leads & Team Directory</span>
+          <span className="text-slate-500 normal-case font-normal text-[11px]">
+            {employees.length} Active Staff Members
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {employees.map((emp) => {
           const isSpecialAdmin = checkIsAdmin(emp.email);
 
@@ -242,6 +286,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({ employees }) => {
             </div>
           );
         })}
+        </div>
       </div>
 
       {/* Add / Edit Employee Modal */}

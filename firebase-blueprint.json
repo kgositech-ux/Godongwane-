@@ -186,6 +186,76 @@
         "entityId": { "type": "string", "maxLength": 128 }
       },
       "required": ["type", "action", "title", "timestamp"]
+    },
+    "TruckVehicle": {
+      "title": "TruckVehicle",
+      "description": "Commercial heavy truck and plant vehicle record",
+      "type": "object",
+      "properties": {
+        "registrationNumber": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 256 },
+        "category": { "type": "string", "enum": ["side_tipper_34t", "flatbed", "mobile_crane", "lowbed", "tipper_10cube"] },
+        "capacity": { "type": "string", "maxLength": 128 },
+        "dailyRateZar": { "type": "number" },
+        "hourlyRateZar": { "type": "number" },
+        "status": { "type": "string", "enum": ["available", "on_job", "maintenance", "dispatched"] },
+        "driverName": { "type": "string", "maxLength": 128 },
+        "driverPhone": { "type": "string", "maxLength": 64 },
+        "assignedProjectId": { "type": "string", "maxLength": 128 },
+        "currentLocation": { "type": "string", "maxLength": 256 },
+        "fuelLevelPercentage": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 2048 }
+      },
+      "required": ["registrationNumber", "name", "category", "status"]
+    },
+    "TruckHireBooking": {
+      "title": "TruckHireBooking",
+      "description": "Truck hire reservation and dispatch record",
+      "type": "object",
+      "properties": {
+        "vehicleId": { "type": "string", "maxLength": 128 },
+        "vehicleName": { "type": "string", "maxLength": 256 },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 256 },
+        "projectId": { "type": "string", "maxLength": 128 },
+        "projectName": { "type": "string", "maxLength": 256 },
+        "hireType": { "type": "string", "enum": ["daily", "hourly", "trip"] },
+        "startDate": { "type": "string", "maxLength": 64 },
+        "endDate": { "type": "string", "maxLength": 64 },
+        "durationDays": { "type": "number" },
+        "rateZar": { "type": "number" },
+        "totalCostZar": { "type": "number" },
+        "status": { "type": "string", "enum": ["scheduled", "active", "completed", "cancelled"] },
+        "pickupLocation": { "type": "string", "maxLength": 256 },
+        "dropoffLocation": { "type": "string", "maxLength": 256 },
+        "driverName": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["vehicleId", "clientId", "clientName", "startDate", "endDate", "totalCostZar", "status"]
+    },
+    "TimesheetEntry": {
+      "title": "TimesheetEntry",
+      "description": "Employee project job usage and hours timesheet record",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "employeeName": { "type": "string", "maxLength": 128 },
+        "projectId": { "type": "string", "maxLength": 128 },
+        "projectName": { "type": "string", "maxLength": 256 },
+        "taskId": { "type": "string", "maxLength": 128 },
+        "taskTitle": { "type": "string", "maxLength": 256 },
+        "date": { "type": "string", "maxLength": 64 },
+        "hoursWorked": { "type": "number" },
+        "overtimeHours": { "type": "number" },
+        "category": { "type": "string", "enum": ["fabrication_welding", "site_rigging", "truck_plant_operation", "project_management", "general_labor"] },
+        "hourlyRateZar": { "type": "number" },
+        "totalCostZar": { "type": "number" },
+        "status": { "type": "string", "enum": ["submitted", "approved", "rejected"] },
+        "supervisorNotes": { "type": "string", "maxLength": 2048 },
+        "approvedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["employeeId", "employeeName", "projectId", "date", "hoursWorked", "status"]
     }
   },
   "firestore": {
@@ -232,6 +302,18 @@
     "/activities/{activityId}": {
       "schema": "Activity",
       "description": "Recent changes and activity audit trail"
+    },
+    "/truck_vehicles/{vehicleId}": {
+      "schema": "TruckVehicle",
+      "description": "Heavy transport trucks and mobile plant fleet"
+    },
+    "/truck_hire_bookings/{bookingId}": {
+      "schema": "TruckHireBooking",
+      "description": "Truck hire client contracts and trip dispatches"
+    },
+    "/timesheets/{timesheetId}": {
+      "schema": "TimesheetEntry",
+      "description": "Employee daily job hours and labor expenditure"
     }
   }
 }

@@ -223,5 +223,60 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isAdmin();
     }
+
+    function isValidTruckVehicle(data) {
+      return data.keys().hasAll(['registrationNumber', 'name', 'category', 'status']) &&
+        data.registrationNumber is string && data.registrationNumber.size() <= 64 &&
+        data.name is string && data.name.size() <= 256 &&
+        data.category in ['side_tipper_34t', 'flatbed', 'mobile_crane', 'lowbed', 'tipper_10cube'] &&
+        data.status in ['available', 'on_job', 'maintenance', 'dispatched'] &&
+        (!('capacity' in data) || (data.capacity is string && data.capacity.size() <= 128)) &&
+        (!('dailyRateZar' in data) || data.dailyRateZar is number) &&
+        (!('hourlyRateZar' in data) || data.hourlyRateZar is number);
+    }
+
+    match /truck_vehicles/{vehicleId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(vehicleId) && isValidTruckVehicle(incoming());
+      allow update: if isSignedIn() && isValidId(vehicleId) && isValidTruckVehicle(incoming());
+      allow delete: if isAdmin();
+    }
+
+    function isValidTruckBooking(data) {
+      return data.keys().hasAll(['vehicleId', 'clientId', 'clientName', 'startDate', 'endDate', 'totalCostZar', 'status']) &&
+        data.vehicleId is string && data.vehicleId.size() <= 128 &&
+        data.clientId is string && data.clientId.size() <= 128 &&
+        data.clientName is string && data.clientName.size() <= 256 &&
+        data.startDate is string && data.startDate.size() <= 64 &&
+        data.endDate is string && data.endDate.size() <= 64 &&
+        data.totalCostZar is number && data.totalCostZar >= 0 &&
+        data.status in ['scheduled', 'active', 'completed', 'cancelled'];
+    }
+
+    match /truck_hire_bookings/{bookingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(bookingId) && isValidTruckBooking(incoming());
+      allow update: if isSignedIn() && isValidId(bookingId) && isValidTruckBooking(incoming());
+      allow delete: if isAdmin();
+    }
+
+    function isValidTimesheet(data) {
+      return data.keys().hasAll(['employeeId', 'employeeName', 'projectId', 'date', 'hoursWorked', 'status']) &&
+        data.employeeId is string && data.employeeId.size() <= 128 &&
+        data.employeeName is string && data.employeeName.size() <= 128 &&
+        data.projectId is string && data.projectId.size() <= 128 &&
+        data.date is string && data.date.size() <= 64 &&
+        data.hoursWorked is number && data.hoursWorked >= 0 &&
+        data.status in ['submitted', 'approved', 'rejected'] &&
+        (!('overtimeHours' in data) || data.overtimeHours is number) &&
+        (!('totalCostZar' in data) || data.totalCostZar is number);
+    }
+
+    match /timesheets/{timesheetId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(timesheetId) && isValidTimesheet(incoming());
+      allow update: if isSignedIn() && isValidId(timesheetId) && isValidTimesheet(incoming());
+      allow delete: if isAdmin();
+    }
   }
 }

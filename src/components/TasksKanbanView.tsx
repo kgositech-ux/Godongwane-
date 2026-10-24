@@ -14,6 +14,7 @@ import {
   ArrowRight,
   ArrowLeft,
   Calendar,
+  MessageSquare,
 } from 'lucide-react';
 import { Task, Project, Employee, TaskStatus, PriorityLevel } from '../types';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -26,6 +27,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { logActivity } from '../utils/activityLogger';
+import { TaskDetailModal } from './TaskDetailModal';
 
 interface TasksKanbanViewProps {
   tasks: Task[];
@@ -47,6 +49,13 @@ export const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(isAddModalOpen);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Default assignee
+  const defaultEmp = employees.length > 0 ? employees[0] : null;
+  const defaultName = defaultEmp?.name || 'Praise-God Cebolenkosi Mthethwa';
+  const defaultEmail = defaultEmp?.email || 'mthethwapraisegodcebolenkosi@gmail.com';
 
   // Task form fields
   const [title, setTitle] = useState('');
@@ -54,8 +63,8 @@ export const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<TaskStatus>('todo');
   const [priority, setPriority] = useState<PriorityLevel>('medium');
-  const [assignedTo, setAssignedTo] = useState('Kgosi');
-  const [assignedToEmail, setAssignedToEmail] = useState('servicewebsites6@gmail.com');
+  const [assignedTo, setAssignedTo] = useState(defaultName);
+  const [assignedToEmail, setAssignedToEmail] = useState(defaultEmail);
   const [dueDate, setDueDate] = useState('');
   const [estimatedHours, setEstimatedHours] = useState(8);
   const [actualHours, setActualHours] = useState(0);
@@ -74,8 +83,8 @@ export const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
     setDescription('');
     setStatus('todo');
     setPriority('medium');
-    setAssignedTo('Kgosi');
-    setAssignedToEmail('servicewebsites6@gmail.com');
+    setAssignedTo(defaultName);
+    setAssignedToEmail(defaultEmail);
     setDueDate(new Date(Date.now() + 86400000 * 5).toISOString().slice(0, 10));
     setEstimatedHours(12);
     setActualHours(0);
@@ -332,8 +341,14 @@ export const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                         </div>
                       </div>
 
-                      <div>
-                        <h4 className="font-semibold text-xs text-slate-100 leading-snug">
+                      <div
+                        onClick={() => {
+                          setDetailTask(t);
+                          setIsDetailOpen(true);
+                        }}
+                        className="cursor-pointer group/title"
+                      >
+                        <h4 className="font-semibold text-xs text-slate-100 leading-snug group-hover/title:text-amber-400 transition-colors">
                           {t.title}
                         </h4>
                         <div className="text-[10px] text-amber-400/90 font-medium truncate mt-0.5">
@@ -342,18 +357,47 @@ export const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                       </div>
 
                       {t.description && (
-                        <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                        <p
+                          onClick={() => {
+                            setDetailTask(t);
+                            setIsDetailOpen(true);
+                          }}
+                          className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed cursor-pointer"
+                        >
                           {t.description}
                         </p>
                       )}
 
+                      {/* Due date countdown & assignee */}
                       <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
                         <div className="flex items-center gap-1 text-slate-300">
                           <User className="w-3 h-3 text-slate-400" />
-                          <span className="truncate max-w-[90px]">{t.assignedTo || 'Unassigned'}</span>
+                          <span className="truncate max-w-[85px]">{t.assignedTo || 'Unassigned'}</span>
                         </div>
-                        <div className="flex items-center gap-1 font-mono text-[10px]">
-                          <Clock className="w-3 h-3 text-amber-400" />
+                        {t.dueDate && (
+                          <div className="flex items-center gap-1 text-[10px] font-mono text-slate-400">
+                            <Calendar className="w-3 h-3 text-amber-400/80" />
+                            <span>{new Date(t.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Discussion & Collaboration Bar */}
+                      <div className="pt-1 flex items-center justify-between gap-1 text-[10px]">
+                        <button
+                          onClick={() => {
+                            setDetailTask(t);
+                            setIsDetailOpen(true);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-amber-300/90 flex items-center gap-1.5 transition-colors font-medium border border-slate-700/60"
+                          title="Open discussions, comments, and task timeline"
+                        >
+                          <MessageSquare className="w-3 h-3 text-amber-400" />
+                          <span>Comments</span>
+                        </button>
+
+                        <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400">
+                          <Clock className="w-3 h-3 text-slate-500" />
                           <span>{t.actualHours || 0}/{t.estimatedHours || 0}h</span>
                         </div>
                       </div>
@@ -488,26 +532,49 @@ export const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-slate-300 mb-1">Assigned Collaborator</label>
-                  <input
-                    type="text"
-                    value={assignedTo}
-                    onChange={(e) => setAssignedTo(e.target.value)}
-                    placeholder="e.g. Praise-God Cebolenkosi"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-300 mb-1">Collaborator Email</label>
-                  <input
-                    type="email"
-                    value={assignedToEmail}
-                    onChange={(e) => setAssignedToEmail(e.target.value)}
-                    placeholder="e.g. servicewebsites6@gmail.com"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                  />
+              <div>
+                <label className="block font-medium text-slate-300 mb-1">Assign to Team Member</label>
+                <select
+                  value={assignedToEmail}
+                  onChange={(e) => {
+                    const sel = employees.find((emp) => emp.email === e.target.value);
+                    if (sel) {
+                      setAssignedTo(sel.name);
+                      setAssignedToEmail(sel.email);
+                    } else {
+                      setAssignedToEmail(e.target.value);
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500 mb-2"
+                >
+                  <option value="">Select from team roster...</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.email}>
+                      {emp.name} — {emp.role} ({emp.department})
+                    </option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Assignee Name</label>
+                    <input
+                      type="text"
+                      value={assignedTo}
+                      onChange={(e) => setAssignedTo(e.target.value)}
+                      placeholder="e.g. Praise-God Cebolenkosi"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Assignee Email</label>
+                    <input
+                      type="email"
+                      value={assignedToEmail}
+                      onChange={(e) => setAssignedToEmail(e.target.value)}
+                      placeholder="e.g. mthethwapraisegodcebolenkosi@gmail.com"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -561,6 +628,18 @@ export const TasksKanbanView: React.FC<TasksKanbanViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Task Details & Collaborative Discussions Modal */}
+      <TaskDetailModal
+        task={detailTask}
+        isOpen={isDetailOpen}
+        onClose={() => {
+          setIsDetailOpen(false);
+          setDetailTask(null);
+        }}
+        projects={projects}
+        employees={employees}
+      />
     </div>
   );
 };

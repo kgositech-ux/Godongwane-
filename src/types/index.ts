@@ -7,8 +7,24 @@ export interface UserProfile {
   photoURL?: string;
   role: UserRole;
   organization?: string;
+  department?: string;
+  phone?: string;
+  bio?: string;
+  statusText?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  authorId: string;
+  authorName: string;
+  authorEmail: string;
+  authorRole?: string;
+  content: string;
+  tag?: 'general' | 'qa_update' | 'blocker' | 'status_change';
+  createdAt: string;
 }
 
 export interface Client {
@@ -65,16 +81,23 @@ export interface Task {
   updatedAt?: string;
 }
 
-export type MilestoneStatus = 'pending' | 'in_progress' | 'completed';
+export type MilestoneStatus = 'pending' | 'in_progress' | 'completed' | 'delayed';
 
 export interface Milestone {
   id: string;
   projectId: string;
   title: string;
   description?: string;
-  dueDate: string;
+  startDate?: string;
+  dueDate: string; // Planned completion date
+  plannedDueDate?: string; // Explicit planned date
+  actualCompletionDate?: string; // Recorded actual completion date
   status: MilestoneStatus;
   progress: number;
+  phase?: string; // e.g. 'Phase 1: Procurement', 'Phase 2: Fabrication', 'Phase 3: Testing'
+  criticalPath?: boolean;
+  assignedLead?: string;
+  varianceDays?: number; // Days ahead (-) or delayed (+)
   createdAt: string;
 }
 
@@ -100,6 +123,10 @@ export interface ProjectDocument {
   uploadedBy?: string;
   uploadedByEmail?: string;
   notes?: string;
+  tags?: string[];
+  shareableId?: string;
+  downloadCount?: number;
+  fileData?: string;
   createdAt: string;
 }
 
@@ -155,12 +182,102 @@ export interface AppNotification {
 
 export interface ActivityItem {
   id: string;
-  type: 'project' | 'task' | 'document' | 'milestone' | 'client';
-  action: 'created' | 'updated' | 'status_changed' | 'progress_updated' | 'uploaded';
+  type: 'project' | 'task' | 'document' | 'milestone' | 'client' | 'truck_hire' | 'timesheet';
+  action: 'created' | 'updated' | 'status_changed' | 'progress_updated' | 'uploaded' | 'dispatched' | 'approved';
   title: string;
   description?: string;
   userName?: string;
   userEmail?: string;
   timestamp: string;
   entityId?: string;
+}
+
+/* =========================================================
+ * Truck Hire & Heavy Logistics Types
+ * ========================================================= */
+export type TruckCategory =
+  | 'tipper'
+  | 'flatbed'
+  | 'lowbed'
+  | 'crane_truck'
+  | 'water_tanker'
+  | 'rigid_truck';
+
+export type TruckStatus = 'available' | 'on_hire' | 'maintenance' | 'dispatched';
+
+export interface TruckVehicle {
+  id: string;
+  name: string;
+  model: string;
+  registration: string;
+  category: TruckCategory;
+  capacity: string;
+  dailyRate: number; // in ZAR
+  hourlyRate: number; // in ZAR
+  status: TruckStatus;
+  driverAssigned?: string;
+  currentProject?: string;
+  location: string;
+  fuelEfficiency?: string;
+  lastInspectionDate?: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface TruckHireBooking {
+  id: string;
+  truckId: string;
+  truckName: string;
+  clientId: string;
+  clientName: string;
+  projectId?: string;
+  projectName?: string;
+  startDate: string;
+  endDate: string;
+  rateType: 'daily' | 'hourly' | 'monthly' | 'tonnage';
+  agreedRate: number;
+  totalEstimatedCost: number;
+  status: 'active' | 'scheduled' | 'completed' | 'cancelled';
+  driverAssigned?: string;
+  pickupLocation: string;
+  destination: string;
+  material?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+/* =========================================================
+ * Employee Job Usage Timesheet Types
+ * ========================================================= */
+export type JobCategory =
+  | 'fabrication'
+  | 'welding'
+  | 'site_assembly'
+  | 'truck_operation'
+  | 'qa_inspection'
+  | 'project_management'
+  | 'logistics';
+
+export type TimesheetStatus = 'submitted' | 'approved' | 'rejected';
+
+export interface TimesheetEntry {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  projectId: string;
+  projectName: string;
+  taskId?: string;
+  taskTitle?: string;
+  date: string;
+  regularHours: number;
+  overtimeHours: number;
+  totalHours: number;
+  hourlyRate: number;
+  totalCost: number;
+  jobCategory: JobCategory;
+  workDescription: string;
+  status: TimesheetStatus;
+  supervisorApprovedBy?: string;
+  approvedAt?: string;
+  createdAt: string;
 }

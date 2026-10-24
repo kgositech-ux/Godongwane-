@@ -7,11 +7,30 @@ import {
   generateExecutiveHTMLReport,
 } from './googleDriveExport';
 
+export interface DriveProjectFolderResult {
+  projectId: string;
+  projectName: string;
+  folderId: string;
+  folderLink: string;
+  files: {
+    id: string;
+    name: string;
+    webViewLink: string;
+  }[];
+}
+
 export interface DriveUploadResult {
   success: boolean;
   folderId: string;
   folderName: string;
   folderLink: string;
+  totalProjectsSynced: number;
+  projectFolders: DriveProjectFolderResult[];
+  masterFiles: {
+    id: string;
+    name: string;
+    webViewLink: string;
+  }[];
   uploadedFiles: {
     id: string;
     name: string;
@@ -34,20 +53,24 @@ export async function createOrGetDriveFolder(
   }
 
   // 1. Check if folder already exists
-  const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  try {
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&pageSize=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
 
-  if (searchRes.ok) {
-    const data = await searchRes.json();
-    if (data.files && data.files.length > 0) {
-      return data.files[0];
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      if (data.files && data.files.length > 0) {
+        return data.files[0];
+      }
     }
+  } catch (e) {
+    console.warn('Folder search check error, proceeding to create:', e);
   }
 
   // 2. Create the folder if not found
@@ -139,33 +162,69 @@ Project Title:        ${project.name}
 Client Name:          ${project.clientName}
 Current Status:       ${project.status.toUpperCase()}
 Priority Level:       ${project.priority.toUpperCase()}
-Completion:           ${project.progressPercentage}%
+Milestone Progress:   ${project.progressPercentage}%
 Project Budget:       R ${(project.budget || 0).toLocaleString('en-ZA')}
 Start Date:           ${project.startDate || 'N/A'}
 Target Delivery:      ${project.targetCompletionDate || 'TBD'}
-Assigned Manager:     ${project.managerName || 'Kgosi (Lead PM)'}
+Assigned Manager:     ${project.managerName || 'Praise-God Cebolenkosi Mthethwa'}
 
-PROJECT DESCRIPTION:
+PROJECT SCOPE & TECHNICAL SPECIFICATION:
 ------------------------------------------------------
 ${project.description}
 
-ASSOCIATED TASKS (${projectTasks.length} Total):
+WORK BREAKDOWN & TASKS (${projectTasks.length} Total):
 ------------------------------------------------------
-${projectTasks.map((t, idx) => `${idx + 1}. [${t.status.toUpperCase()}] ${t.title} (Priority: ${t.priority}, Assigned: ${t.assignedTo || 'Unassigned'}, Due: ${t.dueDate || 'TBD'})`).join('\n')}
+${projectTasks.length === 0 ? 'No tasks defined yet.' : projectTasks.map((t, idx) => `${idx + 1}. [${t.status.toUpperCase()}] ${t.title}
+   - Priority: ${t.priority.toUpperCase()}
+   - Assigned To: ${t.assignedTo || 'Unassigned'}
+   - Due Date: ${t.dueDate || 'TBD'}
+   - Est. Hours: ${t.estimatedHours || 0}h | Actual: ${t.actualHours || 0}h`).join('\n')}
 
 PROJECT MILESTONES (${projectMilestones.length} Total):
 ------------------------------------------------------
-${projectMilestones.map((m, idx) => `${idx + 1}. [${m.status.toUpperCase()} - ${m.progress}%] ${m.title} (Target: ${m.dueDate})`).join('\n')}
+${projectMilestones.length === 0 ? 'No milestones scheduled yet.' : projectMilestones.map((m, idx) => `${idx + 1}. [${m.status.toUpperCase()} - ${m.progress}%] ${m.title}
+   - Target Deadline: ${m.dueDate}
+   - Description: ${m.description || 'N/A'}`).join('\n')}
 
 ======================================================
-Generated via Godongwane Progressive Projects Management Cloud
-Date: ${new Date().toLocaleString('en-ZA')}
+Godongwane Progressive Projects
+Lead Administrator: mthethwapraisegodcebolenkosi@gmail.com
+Backup Administrator: servicewebsites6@gmail.com
+Generated Date: ${new Date().toLocaleString('en-ZA')}
 ======================================================
 `;
 }
 
 /**
+ * Generates a dedicated project task CSV file for an individual project.
+ */
+function generateSingleProjectTasksCSV(project: Project, tasks: Task[]): string {
+  const projectTasks = tasks.filter((t) => t.projectId === project.id);
+  const headers = ['Task Title', 'Status', 'Priority', 'Assigned To', 'Due Date', 'Estimated Hours', 'Actual Hours', 'Notes'];
+  const rows = projectTasks.map((t) => [
+    `"${t.title.replace(/"/g, '""')}"`,
+    t.status,
+    t.priority,
+    `"${(t.assignedTo || 'Unassigned').replace(/"/g, '""')}"`,
+    t.dueDate || '',
+    t.estimatedHours || 0,
+    t.actualHours || 0,
+    `"${(t.description || '').replace(/"/g, '""')}"`,
+  ]);
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+}
+
+/**
  * Executes full upload of all projects, tasks, milestones, and reports directly to Google Drive.
+ * Creates:
+ * 1. Root Folder: "Godongwane Progressive Projects"
+ * 2. Master Portfolio Folder: "00_Executive_Portfolio"
+ *    - Master Portfolio CSV
+ *    - Master Tasks Tracker CSV
+ *    - Executive Briefing HTML Report
+ * 3. Dedicated Folder for EACH project:
+ *    - Project Overview Brief
+ *    - Project Tasks CSV
  */
 export async function syncAllProjectsToGoogleDrive(params: {
   projects: Project[];
@@ -189,7 +248,7 @@ export async function syncAllProjectsToGoogleDrive(params: {
     onProgress,
   } = params;
 
-  onProgress?.('Accessing Google Drive storage...', 10);
+  onProgress?.('Accessing Google Drive storage...', 5);
 
   // 1. Create or locate Root Folder: "Godongwane Progressive Projects"
   const rootFolder = await createOrGetDriveFolder(
@@ -197,109 +256,167 @@ export async function syncAllProjectsToGoogleDrive(params: {
     accessToken
   );
 
-  onProgress?.(`Found or created root folder: ${rootFolder.name}`, 25);
+  onProgress?.(`Found or created root folder: "${rootFolder.name}"`, 12);
 
   const dateStr = new Date().toISOString().slice(0, 10);
-  const uploadedFiles: { id: string; name: string; webViewLink: string }[] = [];
+  const allUploadedFiles: { id: string; name: string; webViewLink: string }[] = [];
+  const masterFiles: { id: string; name: string; webViewLink: string }[] = [];
+  const projectFolders: DriveProjectFolderResult[] = [];
 
-  // 2. Generate and upload Projects Summary CSV (Google Sheets compatible)
-  onProgress?.('Uploading Projects Portfolio Sheet...', 40);
+  // 2. Create Master Overview Folder: "00_Executive_Portfolio"
+  onProgress?.('Setting up Executive Portfolio folder...', 18);
+  const portfolioFolder = await createOrGetDriveFolder(
+    '00_Executive_Portfolio',
+    accessToken,
+    rootFolder.id
+  );
+
+  // 2a. Master Projects CSV
+  onProgress?.('Uploading Master Projects Portfolio Sheet...', 24);
   const projectsCSV = generateProjectsCSV(projects);
-  const projFile = await uploadMultipartFile(
-    `Godongwane_Projects_Portfolio_${dateStr}.csv`,
+  const projMasterFile = await uploadMultipartFile(
+    `Godongwane_Master_Projects_Portfolio_${dateStr}.csv`,
     'text/csv;charset=utf-8',
     projectsCSV,
-    rootFolder.id,
+    portfolioFolder.id,
     accessToken
   );
-  uploadedFiles.push(projFile);
+  masterFiles.push(projMasterFile);
+  allUploadedFiles.push(projMasterFile);
 
-  // 3. Generate and upload Tasks & Milestones Tracker CSV
-  onProgress?.('Uploading Tasks & Workflows Tracker...', 55);
+  // 2b. Master Tasks CSV
+  onProgress?.('Uploading Master Tasks & Workflows Tracker...', 30);
   const tasksCSV = generateTasksCSV(tasks, projects);
-  const taskFile = await uploadMultipartFile(
-    `Godongwane_Tasks_Tracker_${dateStr}.csv`,
+  const taskMasterFile = await uploadMultipartFile(
+    `Godongwane_Master_Tasks_Tracker_${dateStr}.csv`,
     'text/csv;charset=utf-8',
     tasksCSV,
-    rootFolder.id,
+    portfolioFolder.id,
     accessToken
   );
-  uploadedFiles.push(taskFile);
+  masterFiles.push(taskMasterFile);
+  allUploadedFiles.push(taskMasterFile);
 
-  // 4. Generate and upload Executive Briefing Report (HTML/Doc)
-  onProgress?.('Uploading Executive Briefing Report...', 70);
+  // 2c. Executive Briefing HTML Report
+  onProgress?.('Uploading Executive Briefing Dashboard Report...', 38);
   const executiveHtml = generateExecutiveHTMLReport(projects, tasks, milestones, clients);
-  const reportFile = await uploadMultipartFile(
-    `Godongwane_Executive_Briefing_${dateStr}.html`,
+  const reportMasterFile = await uploadMultipartFile(
+    `Godongwane_Executive_Briefing_Report_${dateStr}.html`,
     'text/html;charset=utf-8',
     executiveHtml,
-    rootFolder.id,
+    portfolioFolder.id,
     accessToken
   );
-  uploadedFiles.push(reportFile);
+  masterFiles.push(reportMasterFile);
+  allUploadedFiles.push(reportMasterFile);
 
-  // 5. Upload individual project summary sheets for the active projects
-  onProgress?.('Uploading individual project briefs...', 85);
-  for (const project of projects.slice(0, 5)) {
+  // 3. Create a dedicated folder for EVERY project in the portfolio!
+  const totalProjects = projects.length;
+  for (let i = 0; i < totalProjects; i++) {
+    const project = projects[i];
+    const progressStart = 40 + Math.round((i / totalProjects) * 45);
+    onProgress?.(
+      `Creating Google Drive folder for: "${project.name}" (${i + 1}/${totalProjects})...`,
+      progressStart
+    );
+
+    // Sanitize folder name
+    const sanitizedName = project.name.replace(/[/\\?%*:|"<>]/g, '-').trim();
+    const folderTitle = `${i + 1}. ${sanitizedName}`;
+
+    // Create subfolder under rootFolder
+    const projectFolder = await createOrGetDriveFolder(
+      folderTitle,
+      accessToken,
+      rootFolder.id
+    );
+
+    const projectFiles: { id: string; name: string; webViewLink: string }[] = [];
+
+    // Upload Project Specification Brief
     const briefText = generateProjectSummaryText(project, tasks, milestones);
-    const safeName = project.name.replace(/[/\\?%*:|"<>]/g, '_');
     const briefFile = await uploadMultipartFile(
-      `Project_Brief_${safeName}.txt`,
+      `Project_Brief_${sanitizedName}.txt`,
       'text/plain;charset=utf-8',
       briefText,
-      rootFolder.id,
+      projectFolder.id,
       accessToken
     );
-    uploadedFiles.push(briefFile);
+    projectFiles.push(briefFile);
+    allUploadedFiles.push(briefFile);
+
+    // Upload Dedicated Project Tasks CSV
+    const singleProjTasksCSV = generateSingleProjectTasksCSV(project, tasks);
+    const projTasksFile = await uploadMultipartFile(
+      `Tasks_${sanitizedName}.csv`,
+      'text/csv;charset=utf-8',
+      singleProjTasksCSV,
+      projectFolder.id,
+      accessToken
+    );
+    projectFiles.push(projTasksFile);
+    allUploadedFiles.push(projTasksFile);
+
+    projectFolders.push({
+      projectId: project.id,
+      projectName: project.name,
+      folderId: projectFolder.id,
+      folderLink: projectFolder.webViewLink || `https://drive.google.com/drive/folders/${projectFolder.id}`,
+      files: projectFiles,
+    });
   }
 
-  // 6. Record created Drive documents in Firestore for central access
+  // 4. Record created Drive documents in Firestore for central access
+  onProgress?.('Finalizing records and synchronizing database...', 90);
   try {
     const docRecord: Omit<ProjectDocument, 'id'> = {
-      title: `Google Drive Portfolio Sync (${projects.length} Projects) - ${dateStr}`,
+      title: `Google Drive Portfolio Archive (${projects.length} Projects) - ${dateStr}`,
       type: 'drive_export',
-      fileSize: `${Math.round((projectsCSV.length + tasksCSV.length + executiveHtml.length) / 1024)} KB`,
+      fileSize: `${Math.round((projectsCSV.length + tasksCSV.length + executiveHtml.length + (projects.length * 3000)) / 1024)} KB`,
       driveLink: rootFolder.webViewLink || `https://drive.google.com/drive/folders/${rootFolder.id}`,
-      uploadedBy: userName || 'Kgosi',
-      uploadedByEmail: userEmail || 'servicewebsites6@gmail.com',
-      notes: `Direct Google Drive synchronization with ${uploadedFiles.length} files stored in folder "${rootFolder.name}".`,
+      uploadedBy: userName || 'Praise-God Cebolenkosi Mthethwa',
+      uploadedByEmail: userEmail || 'mthethwapraisegodcebolenkosi@gmail.com',
+      notes: `Direct Google Drive synchronization with ${projectFolders.length} project folders and ${allUploadedFiles.length} files stored in folder "${rootFolder.name}".`,
       createdAt: new Date().toISOString(),
     };
     await addDoc(collection(db, 'documents'), docRecord);
 
-    // 7. Record an activity entry
+    // Activity entry
     await addDoc(collection(db, 'activities'), {
       entityType: 'document',
       entityId: rootFolder.id,
       action: 'create',
-      title: 'Google Drive Sync Completed',
-      description: `Added all ${projects.length} projects and ${uploadedFiles.length} documents directly to Google Drive folder "${rootFolder.name}".`,
+      title: 'All Projects Added to Google Drive',
+      description: `Successfully added all ${projects.length} projects, dedicated folders, task trackers, and executive reports to Google Drive folder "${rootFolder.name}".`,
       timestamp: new Date().toISOString(),
       user: userName || 'Admin',
-      userEmail: userEmail || 'servicewebsites6@gmail.com',
+      userEmail: userEmail || 'mthethwapraisegodcebolenkosi@gmail.com',
     });
 
-    // 8. Add a system notification
+    // Notification entry
     await addDoc(collection(db, 'notifications'), {
-      title: 'Google Drive Backup Complete',
-      message: `All ${projects.length} projects and tracking sheets have been successfully added to your Google Drive folder.`,
+      title: 'Google Drive Sync Complete',
+      message: `All ${projects.length} projects have been added to your Google Drive folder "${rootFolder.name}".`,
       type: 'info',
       read: false,
-      recipientEmail: userEmail || 'servicewebsites6@gmail.com',
+      recipientEmail: userEmail || 'mthethwapraisegodcebolenkosi@gmail.com',
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
     console.warn('Could not record Drive sync in Firestore:', err);
   }
 
-  onProgress?.('All projects added to Google Drive successfully!', 100);
+  onProgress?.('All projects successfully added to Google Drive!', 100);
 
   return {
     success: true,
     folderId: rootFolder.id,
     folderName: rootFolder.name,
     folderLink: rootFolder.webViewLink || `https://drive.google.com/drive/folders/${rootFolder.id}`,
-    uploadedFiles,
+    totalProjectsSynced: projects.length,
+    projectFolders,
+    masterFiles,
+    uploadedFiles: allUploadedFiles,
     timestamp: new Date().toISOString(),
   };
 }

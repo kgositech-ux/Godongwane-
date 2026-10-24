@@ -11,8 +11,10 @@ import {
   ArrowRight,
   AlertCircle,
   Loader2,
-  ShieldCheck,
   FolderCheck,
+  Folder,
+  Layers,
+  ChevronRight,
 } from 'lucide-react';
 import { Project, Task, Milestone, Client, ProjectDocument } from '../types';
 import {
@@ -35,6 +37,7 @@ interface GoogleDriveExportModalProps {
   milestones: Milestone[];
   clients: Client[];
   documents: ProjectDocument[];
+  onOpenHtmlModal?: () => void;
 }
 
 export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
@@ -45,6 +48,7 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
   milestones,
   clients,
   documents,
+  onOpenHtmlModal,
 }) => {
   const { currentUser, userProfile, accessToken, connectGoogleDrive } = useAuth();
   const [syncing, setSyncing] = useState(false);
@@ -53,6 +57,7 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
   const [driveResult, setDriveResult] = useState<DriveUploadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<'folders' | 'files'>('folders');
 
   if (!isOpen) return null;
 
@@ -71,8 +76,8 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
         clients,
         documents,
         accessToken: token,
-        userEmail: currentUser?.email || 'servicewebsites6@gmail.com',
-        userName: userProfile?.displayName || currentUser?.displayName || 'Kgosi (Lead PM)',
+        userEmail: currentUser?.email || 'mthethwapraisegodcebolenkosi@gmail.com',
+        userName: userProfile?.displayName || currentUser?.displayName || 'Praise-God Cebolenkosi Mthethwa',
         onProgress: (msg, pct) => {
           setProgressMsg(msg);
           setProgressPct(pct);
@@ -85,7 +90,7 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
       console.error('Drive upload failed:', err);
       setError(
         err.message ||
-          'Failed to upload directly to Google Drive. You can still download the files locally below.'
+          'Failed to upload directly to Google Drive. You can still download the backup package locally.'
       );
     } finally {
       setSyncing(false);
@@ -136,14 +141,14 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
     const projectsCSV = generateProjectsCSV(projects);
     downloadFile(
       projectsCSV,
-      `Godongwane_Projects_Summary_${new Date().toISOString().slice(0, 10)}.csv`,
+      `Godongwane_Projects_Master_${new Date().toISOString().slice(0, 10)}.csv`,
       'text/csv;charset=utf-8;'
     );
 
     const tasksCSV = generateTasksCSV(tasks, projects);
     downloadFile(
       tasksCSV,
-      `Godongwane_Tasks_Tracking_${new Date().toISOString().slice(0, 10)}.csv`,
+      `Godongwane_Tasks_Tracker_${new Date().toISOString().slice(0, 10)}.csv`,
       'text/csv;charset=utf-8;'
     );
 
@@ -156,33 +161,36 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#111827] border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-[#111827] border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-blue-950/50 via-slate-900 to-amber-950/20">
+        <div className="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-blue-950/60 via-slate-900 to-amber-950/30">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shadow-inner">
               <HardDrive className="w-5 h-5 text-blue-400" />
             </div>
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                Add All Projects to Google Drive
+                <span>Add All Projects to Google Drive</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30">
+                  {projects.length} Projects
+                </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Godongwane Progressive Projects • Google Workspace Integration
+                Godongwane Progressive Projects • Complete Portfolio Cloud Storage
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5 overflow-y-auto">
+        <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
           {/* Confirmation Dialog as mandated by Workspace Integration guideline */}
           {showConfirm && !syncing && !driveResult && (
             <div className="p-5 rounded-2xl bg-blue-950/40 border border-blue-500/30 space-y-4">
@@ -190,37 +198,42 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
                 <FolderArchive className="w-6 h-6 text-blue-400 shrink-0 mt-0.5" />
                 <div>
                   <h3 className="text-sm font-bold text-white">
-                    Confirm Google Drive Upload
+                    Confirm Google Drive Synchronization
                   </h3>
                   <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    This will create or update the dedicated folder{' '}
-                    <strong className="text-white font-mono bg-blue-900/60 px-1.5 py-0.5 rounded">
-                      Godongwane Progressive Projects
-                    </strong>{' '}
-                    in your Google Drive and upload <strong>{projects.length}</strong> projects, full tracking sheets, and executive briefing files.
+                    This will organize and add all <strong className="text-white">{projects.length}</strong> Godongwane projects into your Google Drive under the root folder:
                   </p>
+                  <div className="mt-2 inline-block px-2.5 py-1 rounded-md bg-blue-900/60 text-blue-200 font-mono text-xs border border-blue-700/50">
+                    Google Drive &gt; Godongwane Progressive Projects /
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-slate-900/80 rounded-xl p-3 text-xs space-y-1.5 border border-slate-800 text-slate-300">
+              <div className="bg-slate-900/90 rounded-xl p-3.5 text-xs space-y-2 border border-slate-800 text-slate-300">
                 <div className="font-semibold text-slate-200 text-[11px] uppercase tracking-wider">
-                  Files to be created in your Google Drive:
+                  Structure being created in your Google Drive:
                 </div>
-                <div className="flex items-center gap-2 text-slate-300">
-                  <span className="text-blue-400">•</span>
-                  <span>Godongwane_Projects_Portfolio.csv ({projects.length} projects)</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-300">
-                  <span className="text-emerald-400">•</span>
-                  <span>Godongwane_Tasks_Tracker.csv ({tasks.length} tasks)</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-300">
-                  <span className="text-amber-400">•</span>
-                  <span>Godongwane_Executive_Briefing.html</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-300">
-                  <span className="text-purple-400">•</span>
-                  <span>Individual Project Briefs (Detailed manifests)</span>
+                <div className="space-y-1.5 pl-1 font-mono text-[11px]">
+                  <div className="flex items-center gap-2 text-blue-300 font-bold">
+                    <Folder className="w-3.5 h-3.5" />
+                    <span>00_Executive_Portfolio/</span>
+                  </div>
+                  <div className="pl-5 text-slate-400 text-[10px]">
+                    • Godongwane_Master_Projects_Portfolio.csv<br />
+                    • Godongwane_Master_Tasks_Tracker.csv<br />
+                    • Godongwane_Executive_Briefing_Report.html
+                  </div>
+                  {projects.map((p, idx) => (
+                    <div key={p.id} className="pt-1">
+                      <div className="flex items-center gap-2 text-emerald-300">
+                        <Folder className="w-3.5 h-3.5" />
+                        <span>{idx + 1}. {p.name.slice(0, 32)}/</span>
+                      </div>
+                      <div className="pl-5 text-slate-400 text-[10px]">
+                        • Project_Brief.txt &amp; Tasks_{idx + 1}.csv
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -236,7 +249,7 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
                   className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md shadow-blue-600/25 flex items-center gap-2"
                 >
                   <HardDrive className="w-4 h-4" />
-                  <span>Confirm & Upload to Google Drive</span>
+                  <span>Confirm &amp; Add All to Google Drive</span>
                 </button>
               </div>
             </div>
@@ -244,25 +257,26 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
 
           {/* Sync In Progress */}
           {syncing && (
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-blue-500/30 space-y-4 text-center">
+            <div className="p-6 rounded-2xl bg-slate-900/90 border border-blue-500/30 space-y-4 text-center">
               <div className="w-12 h-12 mx-auto rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center animate-spin">
                 <Loader2 className="w-6 h-6" />
               </div>
               <div>
                 <h4 className="text-sm font-bold text-white">
-                  Syncing to Google Drive...
+                  Adding Projects to Google Drive...
                 </h4>
-                <p className="text-xs text-blue-300 mt-1">{progressMsg}</p>
+                <p className="text-xs text-blue-300 mt-1 font-medium">{progressMsg}</p>
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-amber-500 h-full transition-all duration-300 rounded-full"
+                  className="bg-gradient-to-r from-blue-500 via-indigo-500 to-amber-500 h-full transition-all duration-300 rounded-full"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <p className="text-[11px] text-slate-400">
-                Creating folder and transferring project assets to your Google Drive...
-              </p>
+              <div className="flex justify-between items-center text-[11px] text-slate-400 px-1">
+                <span>Creating dedicated project folders and tracking files</span>
+                <span className="font-mono text-blue-400 font-bold">{progressPct}%</span>
+              </div>
             </div>
           )}
 
@@ -276,45 +290,16 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-emerald-300">
-                      Successfully Added to Google Drive!
+                      All Projects Successfully Added to Google Drive!
                     </h3>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">
-                      Live
+                      Complete
                     </span>
                   </div>
                   <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    All <strong>{projects.length}</strong> Godongwane projects, task rosters, and executive reports have been created in your Google Drive folder{' '}
-                    <strong className="text-white">"{driveResult.folderName}"</strong>.
+                    Created <strong className="text-white">"{driveResult.folderName}"</strong> in your Google Drive with {driveResult.totalProjectsSynced} individual project folders and {driveResult.uploadedFiles.length} generated documents.
                   </p>
                 </div>
-              </div>
-
-              {/* Uploaded Files in Drive */}
-              <div className="space-y-1.5 bg-slate-900/80 rounded-xl p-3 border border-slate-800 text-xs">
-                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Created Google Drive Files:
-                </div>
-                {driveResult.uploadedFiles.map((f) => (
-                  <div
-                    key={f.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-700/50"
-                  >
-                    <span className="text-slate-200 font-mono text-[11px] truncate mr-2">
-                      {f.name}
-                    </span>
-                    {f.webViewLink && (
-                      <a
-                        href={f.webViewLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 text-[11px] inline-flex items-center gap-1 shrink-0 font-medium"
-                      >
-                        <span>Open</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                ))}
               </div>
 
               {/* Action Buttons */}
@@ -328,14 +313,110 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
                   <ExternalLink className="w-4 h-4" />
                   <span>Open Folder in Google Drive</span>
                 </a>
+                {onOpenHtmlModal && (
+                  <button
+                    onClick={onOpenHtmlModal}
+                    className="py-3 px-4 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>View / Download HTML</span>
+                  </button>
+                )}
                 <button
                   onClick={handleDownloadAllLocally}
                   className="py-3 px-4 rounded-xl font-semibold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors flex items-center justify-center gap-1.5 border border-slate-700"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Backup</span>
+                  <span>Download Backup Archive</span>
                 </button>
               </div>
+
+              {/* Tab Selector between Project Folders and Master Files */}
+              <div className="flex border-b border-slate-800 gap-4 text-xs font-semibold pt-2">
+                <button
+                  onClick={() => setSelectedTab('folders')}
+                  className={`pb-2 transition-colors ${
+                    selectedTab === 'folders'
+                      ? 'border-b-2 border-emerald-400 text-emerald-300'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Project Folders ({driveResult.projectFolders.length})
+                </button>
+                <button
+                  onClick={() => setSelectedTab('files')}
+                  className={`pb-2 transition-colors ${
+                    selectedTab === 'files'
+                      ? 'border-b-2 border-emerald-400 text-emerald-300'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Master Files &amp; Executive Portfolio ({driveResult.masterFiles.length})
+                </button>
+              </div>
+
+              {/* Project Folders List */}
+              {selectedTab === 'folders' && (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {driveResult.projectFolders.map((pf, idx) => (
+                    <div
+                      key={pf.projectId}
+                      className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 truncate mr-2">
+                        <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+                        <div className="truncate">
+                          <div className="font-semibold text-white text-xs truncate">
+                            {idx + 1}. {pf.projectName}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {pf.files.length} documents uploaded (Brief &amp; Tasks)
+                          </div>
+                        </div>
+                      </div>
+                      <a
+                        href={pf.folderLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-[11px] font-semibold inline-flex items-center gap-1 shrink-0"
+                      >
+                        <span>Open Folder</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Master Files List */}
+              {selectedTab === 'files' && (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {driveResult.masterFiles.map((mf) => (
+                    <div
+                      key={mf.id}
+                      className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2 truncate mr-2">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="font-mono text-slate-200 text-[11px] truncate">
+                          {mf.name}
+                        </span>
+                      </div>
+                      {mf.webViewLink && (
+                        <a
+                          href={mf.webViewLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 text-[11px] inline-flex items-center gap-1 shrink-0 font-medium"
+                        >
+                          <span>Open File</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -355,24 +436,27 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
             <>
               <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
                 <div className="text-xs font-semibold text-slate-200 flex items-center justify-between">
-                  <span>Project Portfolio Package</span>
+                  <span className="flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-amber-400" />
+                    <span>Portfolio Synchronization Structure</span>
+                  </span>
                   <span className="text-[11px] text-amber-400 font-mono">
-                    {projects.length} Active Projects
+                    {projects.length} Projects • {tasks.length} Tasks
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                   <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-300">
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <Folder className="w-4 h-4 text-amber-400 shrink-0" />
                     <div>
-                      <div className="font-medium text-slate-100">Projects Portfolio Sheet</div>
-                      <div className="text-[10px] text-slate-400">CSV formatted for Google Sheets</div>
+                      <div className="font-medium text-slate-100">Individual Project Folders</div>
+                      <div className="text-[10px] text-slate-400">Folder for each of the {projects.length} projects</div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-300">
                     <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
                     <div>
-                      <div className="font-medium text-slate-100">Tasks & Status Tracker</div>
+                      <div className="font-medium text-slate-100">Tasks &amp; Status Sheets</div>
                       <div className="text-[10px] text-slate-400">CSV formatted for Google Sheets</div>
                     </div>
                   </div>
@@ -381,15 +465,15 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
                     <FileText className="w-4 h-4 text-blue-400 shrink-0" />
                     <div>
                       <div className="font-medium text-slate-100">Executive Briefing Report</div>
-                      <div className="text-[10px] text-slate-400">HTML for Google Docs & Drive</div>
+                      <div className="text-[10px] text-slate-400">HTML for Google Docs &amp; Drive</div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-slate-300">
-                    <FolderArchive className="w-4 h-4 text-amber-400 shrink-0" />
+                    <FolderArchive className="w-4 h-4 text-purple-400 shrink-0" />
                     <div>
-                      <div className="font-medium text-slate-100">Individual Project Briefs</div>
-                      <div className="text-[10px] text-slate-400">Manifests for top projects</div>
+                      <div className="font-medium text-slate-100">Project Specification Briefs</div>
+                      <div className="text-[10px] text-slate-400">Detailed specs, budgets &amp; milestones</div>
                     </div>
                   </div>
                 </div>
@@ -400,20 +484,25 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                   <span>Projects to be Added ({projects.length})</span>
                   <span className="text-[10px] font-mono text-slate-400">
-                    Total: R {projects.reduce((acc, p) => acc + (p.budget || 0), 0).toLocaleString('en-ZA')}
+                    Total Value: R {projects.reduce((acc, p) => acc + (p.budget || 0), 0).toLocaleString('en-ZA')}
                   </span>
                 </div>
-                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-slate-800">
-                  {projects.map((p) => (
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-slate-800">
+                  {projects.map((p, idx) => (
                     <div
                       key={p.id}
                       className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs hover:border-slate-700 transition-colors"
                     >
-                      <div className="truncate font-medium text-slate-200 mr-2">
-                        {p.name}
-                        <span className="block text-[10px] text-slate-400 font-normal">
-                          Client: {p.clientName}
+                      <div className="flex items-center gap-2 truncate mr-2">
+                        <span className="w-5 h-5 rounded-md bg-slate-800 text-slate-300 flex items-center justify-center font-mono text-[10px] shrink-0">
+                          {idx + 1}
                         </span>
+                        <div className="truncate font-medium text-slate-200">
+                          {p.name}
+                          <span className="block text-[10px] text-slate-400 font-normal">
+                            Client: {p.clientName}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] px-2 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-800">
@@ -429,11 +518,11 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
               </div>
 
               {/* Main Actions */}
-              <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                 <button
                   onClick={handleStartDriveUpload}
                   disabled={syncing}
-                  className="flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-blue-600 via-indigo-600 to-amber-600 hover:from-blue-500 hover:to-amber-500 text-white transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
                 >
                   <HardDrive className="w-4 h-4 text-blue-200" />
                   <span>
@@ -442,6 +531,15 @@ export const GoogleDriveExportModal: React.FC<GoogleDriveExportModalProps> = ({
                       : 'Connect Google Drive & Add All Projects'}
                   </span>
                 </button>
+                {onOpenHtmlModal && (
+                  <button
+                    onClick={onOpenHtmlModal}
+                    className="py-3 px-4 rounded-xl font-semibold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 font-bold"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>View / Download HTML</span>
+                  </button>
+                )}
                 <button
                   onClick={handleDownloadAllLocally}
                   className="py-3 px-4 rounded-xl font-semibold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors flex items-center justify-center gap-1.5 border border-slate-700"

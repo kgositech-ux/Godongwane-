@@ -8,13 +8,14 @@ import {
   signOut,
   updateProfile,
   sendPasswordResetEmail,
+  sendEmailVerification,
+  reload,
   GoogleAuthProvider,
 } from 'firebase/auth';
 import {
   doc,
   getDoc,
   setDoc,
-  serverTimestamp,
 } from 'firebase/firestore';
 import {
   auth,
@@ -35,14 +36,18 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   accessToken: string | null;
+  isEmailVerified: boolean;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
+  checkEmailVerified: () => Promise<boolean>;
   connectGoogleDrive: () => Promise<string>;
   logout: () => Promise<void>;
   clearError: () => void;
   refreshProfile: () => Promise<void>;
+  updateUserProfileData: (data: Partial<UserProfile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(getCachedAccessToken());
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean>(false);
 
   const fetchOrCreateProfile = async (user: User): Promise<UserProfile> => {
     const userDocRef = doc(db, 'users', user.uid);
@@ -85,8 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         await setDoc(userDocRef, newProfile);
-        
-        // Also register in admins collection if admin
+
+        // Also register in admins collection if designated admin
         if (isAdminUser) {
           try {
             await setDoc(doc(db, 'admins', user.uid), {
@@ -110,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
+        setIsEmailVerified(user.emailVerified);
         try {
           await fetchOrCreateProfile(user);
         } catch (err: any) {
@@ -120,6 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserProfile(null);
         setCachedAccessToken(null);
         setAccessToken(null);
+        setIsEmailVerified(false);
       }
       setLoading(false);
     });
@@ -136,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCachedAccessToken(credential.accessToken);
         setAccessToken(credential.accessToken);
       }
+      setIsEmailVerified(result.user.emailVerified);
       await fetchOrCreateProfile(result.user);
     } catch (err: any) {
       console.error('Google Sign-in failed', err);
@@ -159,6 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setCachedAccessToken(credential.accessToken);
       setAccessToken(credential.accessToken);
+      setIsEmailVerified(result.user.emailVerified);
       await fetchOrCreateProfile(result.user);
       return credential.accessToken;
     } catch (err: any) {
@@ -172,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       const result = await signInWithEmailAndPassword(auth, email.trim(), pass);
+      setIsEmailVerified(result.user.emailVerified);
       await fetchOrCreateProfile(result.user);
     } catch (err: any) {
       console.error('Email sign-in failed', err);
@@ -187,11 +198,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (name.trim()) {
         await updateProfile(result.user, { displayName: name.trim() });
       }
+      // Send Firebase Email Verification
+      try {
+        await sendEmailVerification(result.user);
+      } catch (e) {
+        console.warn('Could not send initial verification email:', e);
+      }
+      setIsEmailVerified(result.user.emailVerified);
       await fetchOrCreateProfile(result.user);
     } catch (err: any) {
       console.error('Registration failed', err);
       setError(err.message || 'Registration failed');
       throw err;
+    }
+  };
+
+  const sendVerificationEmail = async () => {
+    if (!auth.currentUser) throw new Error('No user currently authenticated');
+    try {
+      await sendEmailVerification(auth.currentUser);
+    } catch (err: any) {
+      console.error('Failed to send verification email', err);
+      setError(err.message || 'Failed to send verification email');
+      throw err;
+    }
+  };
+
+  const checkEmailVerified = async (): Promise<boolean> => {
+    if (!auth.currentUser) return false;
+    try {
+      await reload(auth.currentUser);
+      const verified = auth.currentUser.emailVerified;
+      setIsEmailVerified(verified);
+      return verified;
+    } catch (err: any) {
+      console.error('Failed to reload user verification status', err);
+      return false;
     }
   };
 
@@ -213,6 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAccessToken(null);
       setUserProfile(null);
       setCurrentUser(null);
+      setIsEmailVerified(false);
     } catch (err: any) {
       console.error('Logout failed', err);
       setError(err.message || 'Logout failed');
@@ -222,6 +265,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshProfile = async () => {
     if (currentUser) {
       await fetchOrCreateProfile(currentUser);
+    }
+  };
+
+  const updateUserProfileData = async (data: Partial<UserProfile>) => {
+    if (!currentUser) return;
+    try {
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const updated = {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      };
+      await setDoc(userDocRef, updated, { merge: true });
+      if (data.displayName) {
+        try {
+          await updateProfile(currentUser, { displayName: data.displayName });
+        } catch (e) {
+          console.warn('Could not update Firebase Auth profile displayName', e);
+        }
+      }
+      setUserProfile((prev) => (prev ? { ...prev, ...updated } : (updated as UserProfile)));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${currentUser.uid}`);
     }
   };
 
@@ -239,14 +304,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         accessToken,
+        isEmailVerified,
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,
         resetPassword,
+        sendVerificationEmail,
+        checkEmailVerified,
         connectGoogleDrive,
         logout,
         clearError: () => setError(null),
         refreshProfile,
+        updateUserProfileData,
       }}
     >
       {children}

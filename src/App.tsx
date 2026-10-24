@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import {
   Client,
   Project,
@@ -23,6 +24,9 @@ import {
   Invoice,
   AppNotification,
   ActivityItem,
+  TruckVehicle,
+  TruckHireBooking,
+  TimesheetEntry,
 } from './types';
 import { Sidebar, ActiveTab } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
@@ -30,6 +34,9 @@ import { DashboardView } from './components/DashboardView';
 import { ProjectsView } from './components/ProjectsView';
 import { TasksKanbanView } from './components/TasksKanbanView';
 import { MilestonesView } from './components/MilestonesView';
+import { TruckHireView } from './components/TruckHireView';
+import { TimesheetsView } from './components/TimesheetsView';
+import { TrackingReportsView } from './components/TrackingReportsView';
 import { ClientsView } from './components/ClientsView';
 import { DocumentsView } from './components/DocumentsView';
 import { EmployeesView } from './components/EmployeesView';
@@ -38,7 +45,9 @@ import { InvoicesView } from './components/InvoicesView';
 import { SettingsView } from './components/SettingsView';
 import { AuthModal } from './components/AuthModal';
 import { GoogleDriveExportModal } from './components/GoogleDriveExportModal';
+import { HtmlReportModal } from './components/HtmlReportModal';
 import { NotificationsModal } from './components/NotificationsModal';
+import { ProfileModal } from './components/ProfileModal';
 import {
   seedInitialDatabase,
   initialClients,
@@ -48,20 +57,27 @@ import {
   initialEmployees,
   initialDocuments,
   initialInvoices,
+  initialTruckVehicles,
+  initialTruckBookings,
+  initialTimesheetEntries,
 } from './utils/seedData';
-import { Shield } from 'lucide-react';
+import { Shield, Mail, CheckCircle2 } from 'lucide-react';
 
 function MainApp() {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, sendVerificationEmail, checkEmailVerified } = useAuth();
+  const { theme, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [verifyingNotice, setVerifyingNotice] = useState<string | null>(null);
 
   // Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [driveModalOpen, setDriveModalOpen] = useState(false);
+  const [htmlModalOpen, setHtmlModalOpen] = useState(false);
   const [notifModalOpen, setNotifModalOpen] = useState(false);
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
   const [newTaskModalOpen, setNewTaskModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   // Data Collections initialized with initial demo records for smooth immediate view
   const [clients, setClients] = useState<Client[]>(
@@ -73,6 +89,9 @@ function MainApp() {
   const [documents, setDocuments] = useState<ProjectDocument[]>(initialDocuments);
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
+  const [vehicles, setVehicles] = useState<TruckVehicle[]>(initialTruckVehicles);
+  const [truckBookings, setTruckBookings] = useState<TruckHireBooking[]>(initialTruckBookings);
+  const [timesheets, setTimesheets] = useState<TimesheetEntry[]>(initialTimesheetEntries);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
 
@@ -186,6 +205,45 @@ function MainApp() {
       }
     );
 
+    // 10. Truck Vehicles Listener
+    const unsubVehicles = onSnapshot(
+      collection(db, 'truck_vehicles'),
+      (snap) => {
+        if (!snap.empty) {
+          const list: TruckVehicle[] = [];
+          snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
+          setVehicles(list);
+        }
+      },
+      (error) => console.warn('Vehicles listener warning:', error)
+    );
+
+    // 11. Truck Bookings Listener
+    const unsubBookings = onSnapshot(
+      collection(db, 'truck_hire_bookings'),
+      (snap) => {
+        if (!snap.empty) {
+          const list: TruckHireBooking[] = [];
+          snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
+          setTruckBookings(list);
+        }
+      },
+      (error) => console.warn('Truck bookings listener warning:', error)
+    );
+
+    // 12. Timesheets Listener
+    const unsubTimesheets = onSnapshot(
+      collection(db, 'timesheets'),
+      (snap) => {
+        if (!snap.empty) {
+          const list: TimesheetEntry[] = [];
+          snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
+          setTimesheets(list);
+        }
+      },
+      (error) => console.warn('Timesheets listener warning:', error)
+    );
+
     return () => {
       unsubClients();
       unsubProjects();
@@ -196,6 +254,9 @@ function MainApp() {
       unsubInvoices();
       unsubNotifications();
       unsubActivities();
+      unsubVehicles();
+      unsubBookings();
+      unsubTimesheets();
     };
   }, [currentUser, loading]);
 
@@ -208,13 +269,19 @@ function MainApp() {
       case 'projects':
         return 'Projects';
       case 'tasks':
-        return 'Jobs';
+        return 'Jobs & Work Orders';
       case 'milestones':
-        return 'Milestones';
+        return 'Milestones (Gantt)';
+      case 'truck_hire':
+        return 'Truck Hire & Plant Fleet';
+      case 'timesheets':
+        return 'Job Usage Timesheets';
+      case 'reports':
+        return 'Tracking & Audit Reports';
       case 'clients':
         return 'Client Database';
       case 'documents':
-        return 'Documents';
+        return 'Documents Repo';
       case 'employees':
         return 'Employees';
       case 'payroll':
@@ -222,21 +289,25 @@ function MainApp() {
       case 'invoices':
         return 'Invoices';
       case 'settings':
-        return 'Settings';
+        return 'Settings & Theme';
       default:
         return 'Portal';
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col antialiased selection:bg-amber-500 selection:text-slate-950 font-sans">
-      {/* Sidebar Navigation */}
+    <div className={`min-h-screen ${
+      isDark ? 'bg-[#090d16] text-slate-100' : 'bg-slate-50 text-slate-900'
+    } flex flex-col antialiased selection:bg-amber-500 selection:text-slate-950 font-sans transition-colors duration-200`}>
+      {/* Sidebar Navigation: Full screen on mobile */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         onOpenDriveExport={() => setDriveModalOpen(true)}
+        onOpenProfile={() => setProfileModalOpen(true)}
+        onOpenAuth={() => setAuthModalOpen(true)}
       />
 
       {/* Main Content Pane */}
@@ -244,8 +315,10 @@ function MainApp() {
         <Navbar
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
           onOpenDriveModal={() => setDriveModalOpen(true)}
+          onOpenHtmlModal={() => setHtmlModalOpen(true)}
           onOpenNotifications={() => setNotifModalOpen(true)}
           onOpenAuth={() => setAuthModalOpen(true)}
+          onOpenProfile={() => setProfileModalOpen(true)}
           unreadCount={unreadNotifsCount}
           currentTitle={getTabTitle(activeTab)}
         />
@@ -265,6 +338,49 @@ function MainApp() {
             >
               Sign In
             </button>
+          </div>
+        )}
+
+        {/* Unverified Email Alert Banner */}
+        {currentUser && !currentUser.emailVerified && currentUser.providerData.some((p) => p.providerId === 'password') && (
+          <div className="bg-gradient-to-r from-blue-900/40 via-amber-900/30 to-blue-950/40 border-b border-amber-500/30 px-4 py-2 sm:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-200">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Action Required:</strong> A verification link was sent to <span className="font-mono text-white underline">{currentUser.email}</span>. Please confirm to verify your account.
+                {verifyingNotice && <span className="ml-2 text-emerald-300 font-semibold">{verifyingNotice}</span>}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await sendVerificationEmail();
+                    setVerifyingNotice('Verification email resent!');
+                    setTimeout(() => setVerifyingNotice(null), 4000);
+                  } catch (e: any) {
+                    setVerifyingNotice(e.message || 'Error sending email');
+                  }
+                }}
+                className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition-colors"
+              >
+                Resend Link
+              </button>
+              <button
+                onClick={async () => {
+                  const verified = await checkEmailVerified();
+                  if (verified) {
+                    setVerifyingNotice('Verified successfully!');
+                  } else {
+                    setVerifyingNotice('Not yet verified in inbox.');
+                  }
+                  setTimeout(() => setVerifyingNotice(null), 4000);
+                }}
+                className="px-2.5 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors"
+              >
+                I've Confirmed
+              </button>
+            </div>
           </div>
         )}
 
@@ -288,7 +404,11 @@ function MainApp() {
             <ProjectsView
               projects={projects}
               clients={clients}
+              tasks={tasks}
+              documents={documents}
+              employees={employees}
               onOpenDriveModal={() => setDriveModalOpen(true)}
+              onOpenHtmlModal={() => setHtmlModalOpen(true)}
               isAddModalOpen={newProjectModalOpen}
               onCloseAddModal={() => setNewProjectModalOpen(false)}
             />
@@ -306,6 +426,39 @@ function MainApp() {
 
           {activeTab === 'milestones' && (
             <MilestonesView milestones={milestones} projects={projects} />
+          )}
+
+          {activeTab === 'truck_hire' && (
+            <TruckHireView
+              vehicles={vehicles}
+              bookings={truckBookings}
+              clients={clients}
+              projects={projects}
+            />
+          )}
+
+          {activeTab === 'timesheets' && (
+            <TimesheetsView
+              timesheets={timesheets}
+              employees={employees}
+              projects={projects}
+              tasks={tasks}
+            />
+          )}
+
+          {activeTab === 'reports' && (
+            <TrackingReportsView
+              projects={projects}
+              milestones={milestones}
+              tasks={tasks}
+              employees={employees}
+              vehicles={vehicles}
+              truckBookings={truckBookings}
+              timesheets={timesheets}
+              clients={clients}
+              onOpenDriveModal={() => setDriveModalOpen(true)}
+              onOpenHtmlReport={() => setHtmlModalOpen(true)}
+            />
           )}
 
           {activeTab === 'clients' && (
@@ -346,6 +499,7 @@ function MainApp() {
             <SettingsView
               onOpenDriveModal={() => setDriveModalOpen(true)}
               onOpenAuthModal={() => setAuthModalOpen(true)}
+              onOpenProfileModal={() => setProfileModalOpen(true)}
             />
           )}
         </main>
@@ -357,6 +511,11 @@ function MainApp() {
         onClose={() => setAuthModalOpen(false)}
       />
 
+      <ProfileModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+      />
+
       <GoogleDriveExportModal
         isOpen={driveModalOpen}
         onClose={() => setDriveModalOpen(false)}
@@ -365,6 +524,16 @@ function MainApp() {
         milestones={milestones}
         clients={clients}
         documents={documents}
+        onOpenHtmlModal={() => setHtmlModalOpen(true)}
+      />
+
+      <HtmlReportModal
+        isOpen={htmlModalOpen}
+        onClose={() => setHtmlModalOpen(false)}
+        projects={projects}
+        tasks={tasks}
+        milestones={milestones}
+        clients={clients}
       />
 
       <NotificationsModal
@@ -378,8 +547,10 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

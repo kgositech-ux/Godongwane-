@@ -13,8 +13,9 @@ import {
   ExternalLink,
   HardDrive,
   CheckCircle2,
+  FileCode,
 } from 'lucide-react';
-import { Project, Client, PriorityLevel, ProjectStatus } from '../types';
+import { Project, Client, PriorityLevel, ProjectStatus, Task, ProjectDocument, Employee } from '../types';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
   collection,
@@ -29,7 +30,11 @@ import { logActivity } from '../utils/activityLogger';
 interface ProjectsViewProps {
   projects: Project[];
   clients: Client[];
+  tasks?: Task[];
+  documents?: ProjectDocument[];
+  employees?: Employee[];
   onOpenDriveModal: () => void;
+  onOpenHtmlModal?: () => void;
   isAddModalOpen?: boolean;
   onCloseAddModal?: () => void;
 }
@@ -37,7 +42,11 @@ interface ProjectsViewProps {
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
   projects,
   clients,
+  tasks = [],
+  documents = [],
+  employees = [],
   onOpenDriveModal,
+  onOpenHtmlModal,
   isAddModalOpen = false,
   onCloseAddModal,
 }) => {
@@ -46,6 +55,8 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(isAddModalOpen);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [detailProject, setDetailProject] = useState<Project | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // Form fields
   const [name, setName] = useState('');
@@ -57,7 +68,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [targetDate, setTargetDate] = useState('');
   const [budget, setBudget] = useState(150000);
   const [progress, setProgress] = useState(25);
-  const [managerName, setManagerName] = useState('Kgosi (Service Websites)');
+  const [managerName, setManagerName] = useState('Praise-God Cebolenkosi Mthethwa');
   const [submitting, setSubmitting] = useState(false);
 
   // Sync prop changes
@@ -79,7 +90,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     setTargetDate('');
     setBudget(250000);
     setProgress(10);
-    setManagerName('Kgosi (Service Websites)');
+    setManagerName('Praise-God Cebolenkosi Mthethwa');
     setModalOpen(true);
   };
 
@@ -232,7 +243,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             onClick={onOpenDriveModal}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-600/30 to-indigo-600/30 hover:from-blue-600/40 hover:to-indigo-600/40 text-blue-200 border border-blue-500/40 transition-all shadow-xs"
           >
             <HardDrive className="w-4 h-4 text-blue-400" />
             <span>Add All to Drive</span>
@@ -243,6 +254,47 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
           >
             <Plus className="w-4 h-4" />
             <span>+ New Project</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Prominent Google Drive Portfolio Sync Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/40 border border-blue-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5 border border-blue-500/30">
+            <HardDrive className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white">
+                Google Drive Cloud Portfolio Sync
+              </h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
+                Auto-Folder Generation
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+              Add all <strong>{projects.length}</strong> Godongwane projects directly to your Google Drive. Creates a root folder with dedicated project subfolders, tasks tracking spreadsheets (CSV), and executive briefing reports.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
+          {onOpenHtmlModal && (
+            <button
+              onClick={onOpenHtmlModal}
+              className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <FileCode className="w-4 h-4" />
+              <span>HTML Report</span>
+            </button>
+          )}
+          <button
+            onClick={onOpenDriveModal}
+            className="px-4 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <HardDrive className="w-4 h-4" />
+            <span>Add All to Google Drive</span>
           </button>
         </div>
       </div>
@@ -318,14 +370,28 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 </div>
               </div>
 
-              <div>
-                <h3 className="font-bold text-sm text-slate-100 line-clamp-1">{p.name}</h3>
+              <div
+                onClick={() => {
+                  setDetailProject(p);
+                  setIsDetailOpen(true);
+                }}
+                className="cursor-pointer group/title"
+              >
+                <h3 className="font-bold text-sm text-slate-100 line-clamp-1 group-hover/title:text-amber-400 transition-colors">
+                  {p.name}
+                </h3>
                 <div className="text-[11px] text-amber-400 mt-0.5 font-medium">
                   {p.clientName}
                 </div>
               </div>
 
-              <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">
+              <p
+                onClick={() => {
+                  setDetailProject(p);
+                  setIsDetailOpen(true);
+                }}
+                className="text-xs text-slate-400 line-clamp-3 leading-relaxed cursor-pointer"
+              >
                 {p.description}
               </p>
             </div>
@@ -512,11 +578,26 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Lead Manager</label>
+                  {employees.length > 0 && (
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) setManagerName(e.target.value);
+                      }}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 mb-1.5"
+                    >
+                      <option value="">Select from team roster...</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.name}>
+                          {emp.name} ({emp.role})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <input
                     type="text"
                     value={managerName}
                     onChange={(e) => setManagerName(e.target.value)}
-                    placeholder="e.g. Kgosi (Service Websites)"
+                    placeholder="e.g. Praise-God Cebolenkosi Mthethwa"
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500"
                   />
                 </div>
@@ -539,6 +620,192 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Project Overview & Details Modal */}
+      {detailProject && isDetailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#111827] border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-800 bg-[#0d131f] flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                    {detailProject.status.replace('_', ' ')}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    {detailProject.clientName}
+                  </span>
+                </div>
+                <h3 className="font-bold text-white text-lg">{detailProject.name}</h3>
+              </div>
+              <button
+                onClick={() => setIsDetailOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 text-xs">
+              {/* Financial & Timeline Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800/80">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Budget</span>
+                  <span className="font-mono font-bold text-white text-sm">
+                    R {(detailProject.budget || 0).toLocaleString('en-ZA')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Completion</span>
+                  <span className="font-mono font-bold text-amber-400 text-sm">
+                    {detailProject.progressPercentage}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Target Date</span>
+                  <span className="text-slate-200 font-medium text-sm">
+                    {detailProject.targetCompletionDate || 'Open'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Lead Manager</span>
+                  <span className="text-slate-200 font-medium text-xs truncate block">
+                    {detailProject.managerName || 'Praise-God Cebolenkosi'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Milestone Progress</span>
+                  <span className="font-mono text-amber-400 font-bold">{detailProject.progressPercentage}%</span>
+                </div>
+                <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${detailProject.progressPercentage}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <span className="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
+                  Project Scope & Description
+                </span>
+                <p className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 leading-relaxed whitespace-pre-wrap">
+                  {detailProject.description}
+                </p>
+              </div>
+
+              {/* Associated Tasks */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
+                    Associated Tasks ({tasks.filter((t) => t.projectId === detailProject.id).length})
+                  </span>
+                  <span className="text-slate-400 text-[11px]">
+                    {tasks.filter((t) => t.projectId === detailProject.id && t.status === 'done').length} Completed
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {tasks.filter((t) => t.projectId === detailProject.id).length === 0 ? (
+                    <div className="p-4 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                      No tasks assigned yet.
+                    </div>
+                  ) : (
+                    tasks
+                      .filter((t) => t.projectId === detailProject.id)
+                      .map((t) => (
+                        <div
+                          key={t.id}
+                          className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between"
+                        >
+                          <div>
+                            <span className="font-semibold text-white block">{t.title}</span>
+                            <span className="text-[10px] text-slate-400">
+                              Assigned: {t.assignedTo || 'Unassigned'} • Due: {t.dueDate || 'No date'}
+                            </span>
+                          </div>
+                          <span
+                            className={`text-[9px] uppercase px-2 py-0.5 rounded font-bold ${
+                              t.status === 'done'
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : t.status === 'in_progress'
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'bg-slate-800 text-slate-400'
+                            }`}
+                          >
+                            {t.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+
+              {/* Associated Documents */}
+              <div className="space-y-2">
+                <span className="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
+                  Repository Documents ({documents.filter((d) => d.projectId === detailProject.id).length})
+                </span>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {documents.filter((d) => d.projectId === detailProject.id).length === 0 ? (
+                    <div className="p-3 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                      No documents registered for this project yet.
+                    </div>
+                  ) : (
+                    documents
+                      .filter((d) => d.projectId === detailProject.id)
+                      .map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="p-2 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between"
+                        >
+                          <div>
+                            <span className="font-semibold text-white block">{doc.title}</span>
+                            <span className="text-[10px] text-slate-400">
+                              {doc.type.toUpperCase()} • {doc.fileSize}
+                            </span>
+                          </div>
+                          <a
+                            href={doc.driveLink || 'https://drive.google.com/drive/my-drive'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 text-[11px] font-semibold"
+                          >
+                            View
+                          </a>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setIsDetailOpen(false);
+                  openEditModal(detailProject);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs flex items-center gap-1.5"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Edit Project Specs</span>
+              </button>
+
+              <button
+                onClick={() => setIsDetailOpen(false)}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
